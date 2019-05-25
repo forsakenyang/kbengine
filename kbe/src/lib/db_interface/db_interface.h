@@ -37,7 +37,7 @@ public:
 	db_numConnections_(1),
 	lastquery_()
 	{
-		strncpy(name_, name, MAX_NAME);
+		strncpy(name_, name, MAX_NAME - 1);
 		int dbIndex = g_kbeSrvConfig.dbInterfaceName2dbInterfaceIndex(this->name());
 		KBE_ASSERT(dbIndex >= 0);
 		dbIndex_ = dbIndex;
@@ -84,12 +84,12 @@ public:
 	}
 
 	/**
-	返回这个接口的名称
+		返回这个接口的名称
 	*/
 	const char* name() const { return name_; }
 
 	/**
-	返回这个接口的索引
+		返回这个接口的索引
 	*/
 	uint16 dbIndex() const { return dbIndex_; }
 

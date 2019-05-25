@@ -73,7 +73,7 @@ thread::TPTask::TPTaskState DataDownload::presentMainThread()
 
 	if ((remainSent_ > 0 && currSent_ < remainSent_) || totalBytes_ == 0)
 	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
 		if(!sentStart_)
 		{
@@ -142,7 +142,7 @@ thread::TPTask::TPTaskState DataDownload::presentMainThread()
 
 		pDataDownloads_->onDownloadCompleted(this);
 
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 
 
 		pBundle->newMessage(ClientInterface::onStreamDataCompleted);
@@ -220,13 +220,7 @@ FileDataDownload::FileDataDownload(PyObjectPtr objptr,
 							const std::string & descr, int16 id):
 DataDownload(objptr, descr, id)
 {
-	wchar_t* PyUnicode_AsWideCharStringRet1 = PyUnicode_AsWideCharString(objptr.get(), NULL);
-	char* pDescr = strutil::wchar2char(PyUnicode_AsWideCharStringRet1);
-	PyMem_Free(PyUnicode_AsWideCharStringRet1);
-
-	path_ = pDescr;
-	free(pDescr);
-
+	path_ = PyUnicode_AsUTF8AndSize(objptr.get(), NULL);
 	stream_ = new char[65537];
 }
 

@@ -101,10 +101,39 @@ void ClientObject::reset(void)
 	connectedBaseapp_ = false;
 }
 
+void ClientObject::clearStates(void)
+{
+	if (pTCPPacketReceiverEx_)
+		Bots::getSingleton().networkInterface().dispatcher().deregisterReadFileDescriptor(*pTCPPacketReceiverEx_->pEndPoint());
+
+	if (pKCPPacketReceiverEx_)
+		Bots::getSingleton().networkInterface().dispatcher().deregisterReadFileDescriptor(*pKCPPacketReceiverEx_->pEndPoint());
+
+	pServerChannel_->fina_kcp();
+	pServerChannel_->stopSend();
+	pServerChannel_->pPacketSender(NULL);
+	pServerChannel_->pPacketReceiver(NULL);
+
+	SAFE_RELEASE(pTCPPacketSenderEx_);
+	SAFE_RELEASE(pTCPPacketReceiverEx_);
+
+	SAFE_RELEASE(pKCPPacketSenderEx_);
+	SAFE_RELEASE(pKCPPacketReceiverEx_);
+
+	if (pServerChannel_->pEndPoint())
+	{
+		pServerChannel_->pEndPoint()->destroySSL();
+		pServerChannel_->pEndPoint()->close();
+		pServerChannel_->pEndPoint(NULL);
+	}
+}
+
 //-------------------------------------------------------------------------------------
 bool ClientObject::initCreate()
 {
-	Network::EndPoint* pEndpoint = Network::EndPoint::createPoolObject();
+	clearStates();
+
+	Network::EndPoint* pEndpoint = Network::EndPoint::createPoolObject(OBJECTPOOL_POINT);
 	
 	pEndpoint->socket(SOCK_STREAM);
 	if (!pEndpoint->good())
@@ -116,12 +145,17 @@ bool ClientObject::initCreate()
 	}
 	
 	ENGINE_COMPONENT_INFO& infos = g_kbeSrvConfig.getBots();
+	if (infos.login_port_max > infos.login_port_min)
+	{
+		infos.login_port = infos.login_port_min + (rand() % (infos.login_port_max - infos.login_port_min + 1));
+	}
+
 	u_int32_t address;
 
 	Network::Address::string2ip(infos.login_ip, address);
 	if(pEndpoint->connect(htons(infos.login_port), address) == -1)
 	{
-		ERROR_MSG(fmt::format("ClientObject::initNetwork({1}): connect server({2}:{3}) is error({0})!\n",
+		ERROR_MSG(fmt::format("ClientObject::initNetwork({1}): connect server({2}:{3}) error({0})!\n",
 			kbe_strerror(), name_, infos.login_ip, infos.login_port));
 
 		Network::EndPoint::reclaimPoolObject(pEndpoint);
@@ -151,7 +185,7 @@ bool ClientObject::initCreate()
 	//Bots::getSingleton().networkInterface().dispatcher().registerWriteFileDescriptor((*pEndpoint), pTCPPacketSenderEx_);
 	pServerChannel_->pPacketSender(pTCPPacketSenderEx_);
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(LoginappInterface::hello);
 	(*pBundle) << KBEVersion::versionString() << KBEVersion::scriptVersionString();
 
@@ -174,6 +208,8 @@ bool ClientObject::initCreate()
 //-------------------------------------------------------------------------------------
 bool ClientObject::initLoginBaseapp()
 {
+	clearStates();
+
 	if(pTCPPacketReceiverEx_)
 		Bots::getSingleton().networkInterface().dispatcher().deregisterReadFileDescriptor(*pTCPPacketReceiverEx_->pEndPoint());
 
@@ -200,7 +236,7 @@ bool ClientObject::initLoginBaseapp()
 	// 首先尝试用udp交互
 	if (udp_port_ > 0)
 	{
-		Network::EndPoint* pUdpEndpoint = Network::EndPoint::createPoolObject();
+		Network::EndPoint* pUdpEndpoint = Network::EndPoint::createPoolObject(OBJECTPOOL_POINT);
 
 		pUdpEndpoint->socket(SOCK_DGRAM);
 		if (!pUdpEndpoint->good())
@@ -220,16 +256,10 @@ bool ClientObject::initLoginBaseapp()
 		if (pUdpEndpoint->sendto((void*)Network::UDP_HELLO, strlen(Network::UDP_HELLO)) != -1)
 		{
 			// 等待接收返回包
-			Network::UDPPacket* pHelloAckUDPPacket = Network::UDPPacket::createPoolObject();
+			Network::UDPPacket* pHelloAckUDPPacket = Network::UDPPacket::createPoolObject(OBJECTPOOL_POINT);
 
-			fd_set	frds;
-			struct timeval tv = { 0, 1000000 }; // 1s
-
-			FD_ZERO(&frds);
-			FD_SET((int)(*pUdpEndpoint), &frds);
-
-			int selgot = select((*pUdpEndpoint) + 1, &frds, NULL, NULL, &tv);
-			if (selgot <= 0)
+			bool ret = Network::kbe_poll(int(*pUdpEndpoint));
+			if (!ret)
 			{
 				Network::UDPPacket::reclaimPoolObject(pHelloAckUDPPacket);
 				ERROR_MSG("ClientObject::initLogin: recvfrom timeout!\n");
@@ -281,7 +311,7 @@ bool ClientObject::initLoginBaseapp()
 
 					Bots::getSingleton().networkInterface().dispatcher().registerReadFileDescriptor((*pUdpEndpoint), pKCPPacketReceiverEx_);
 
-					Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+					Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 					(*pBundle).newMessage(BaseappInterface::hello);
 					(*pBundle) << KBEVersion::versionString() << KBEVersion::scriptVersionString();
 
@@ -316,7 +346,7 @@ bool ClientObject::initLoginBaseapp()
 	// 如果udp可以通讯则不再启用tcp交互
 	if (!connectedBaseapp_ && tcp_port_ > 0)
 	{
-		Network::EndPoint* pTcpEndpoint = Network::EndPoint::createPoolObject();
+		Network::EndPoint* pTcpEndpoint = Network::EndPoint::createPoolObject(OBJECTPOOL_POINT);
 
 		pTcpEndpoint->socket(SOCK_STREAM);
 		if (!pTcpEndpoint->good())
@@ -329,7 +359,7 @@ bool ClientObject::initLoginBaseapp()
 
 		if (pTcpEndpoint->connect(htons(tcp_port_), srv_address) == -1)
 		{
-			ERROR_MSG(fmt::format("ClientObject::initLogin({}): connect server is error({})!\n",
+			ERROR_MSG(fmt::format("ClientObject::initLogin({}): connect server error({})!\n",
 				kbe_strerror(), name_));
 
 			Network::EndPoint::reclaimPoolObject(pTcpEndpoint);
@@ -355,7 +385,7 @@ bool ClientObject::initLoginBaseapp()
 		//Bots::getSingleton().networkInterface().dispatcher().registerWriteFileDescriptor((*pEndpoint), pTCPPacketSenderEx_);
 		pServerChannel_->pPacketSender(pTCPPacketSenderEx_);
 
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(BaseappInterface::hello);
 		(*pBundle) << KBEVersion::versionString() << KBEVersion::scriptVersionString();
 
@@ -385,7 +415,7 @@ void ClientObject::gameTick()
 {
 	if(pServerChannel()->pEndPoint())
 	{
-		if(pServerChannel()->isCondemn())
+		if(pServerChannel()->condemn() > 0)
 		{
 			destroy();
 			return;

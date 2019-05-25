@@ -389,7 +389,7 @@ bool EntityTableMysql::syncToDB(DBInterface* pdbi)
 	}
 	catch(...)
 	{
-		ERROR_MSG(fmt::format("EntityTableMysql::syncToDB(): is error({}: {})\n lastQuery: {}.\n", 
+		ERROR_MSG(fmt::format("EntityTableMysql::syncToDB(): error({}: {})\n lastQuery: {}.\n", 
 			pdbi->getlasterror(), pdbi->getstrerror(), static_cast<DBInterfaceMysql*>(pdbi)->lastquery()));
 
 		return false;
@@ -1861,7 +1861,7 @@ void EntityTableItemMysql_STRING::getWriteSqlItem(DBInterface* pdbi,
 
 	SAFE_RELEASE_ARRAY(tbuf);
 
-	memset(pSotvs, 0, sizeof(pSotvs->sqlval));
+	memset(pSotvs->sqlval, 0, sizeof(pSotvs->sqlval));
 	pSotvs->sqlkey = db_item_name();
 	context.items.push_back(KBEShared_ptr<mysql::DBContext::DB_ITEM_DATA>(pSotvs));
 }
@@ -1931,7 +1931,7 @@ void EntityTableItemMysql_UNICODE::getWriteSqlItem(DBInterface* pdbi, MemoryStre
 	pSotvs->extraDatas += "\"";
 	SAFE_RELEASE_ARRAY(tbuf);
 
-	memset(pSotvs, 0, sizeof(pSotvs->sqlval));
+	memset(pSotvs->sqlval, 0, sizeof(pSotvs->sqlval));
 	pSotvs->sqlkey = db_item_name();
 	context.items.push_back(KBEShared_ptr<mysql::DBContext::DB_ITEM_DATA>(pSotvs));
 }
@@ -1983,7 +1983,7 @@ void EntityTableItemMysql_BLOB::getWriteSqlItem(DBInterface* pdbi, MemoryStream*
 	pSotvs->extraDatas += "\"";
 	SAFE_RELEASE_ARRAY(tbuf);
 
-	memset(pSotvs, 0, sizeof(pSotvs->sqlval));
+	memset(pSotvs->sqlval, 0, sizeof(pSotvs->sqlval));
 	pSotvs->sqlkey = db_item_name();
 	context.items.push_back(KBEShared_ptr<mysql::DBContext::DB_ITEM_DATA>(pSotvs));
 }
@@ -2035,7 +2035,7 @@ void EntityTableItemMysql_PYTHON::getWriteSqlItem(DBInterface* pdbi, MemoryStrea
 	pSotvs->extraDatas += "\"";
 	SAFE_RELEASE_ARRAY(tbuf);
 
-	memset(pSotvs, 0, sizeof(pSotvs->sqlval));
+	memset(pSotvs->sqlval, 0, sizeof(pSotvs->sqlval));
 	pSotvs->sqlkey = db_item_name();
 	context.items.push_back(KBEShared_ptr<mysql::DBContext::DB_ITEM_DATA>(pSotvs));
 }

@@ -85,13 +85,13 @@ void Proxy::kick()
 	Network::Channel* pChannel = Baseapp::getSingleton().networkInterface().findChannel(addr_);
 	if(pChannel && !pChannel->isDestroyed())
 	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(ClientInterface::onKicked);
 		ClientInterface::onKickedArgs1::staticAddToBundle(*pBundle, SERVER_ERR_PROXY_DESTROYED);
 		//pBundle->send(Baseapp::getSingleton().networkInterface(), pChannel);
 		this->sendToClient(ClientInterface::onKicked, pBundle);
 		this->sendToClient();
-		pChannel->condemn("");
+		pChannel->condemn("", true);
 	}
 }
 
@@ -101,12 +101,12 @@ void Proxy::initClientBasePropertys()
 	if(clientEntityCall() == NULL)
 		return;
 
-	MemoryStream* s1 = MemoryStream::createPoolObject();
+	MemoryStream* s1 = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 	addClientDataToStream(s1);
 	
 	if(s1->wpos() > 0)
 	{
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(ClientInterface::onUpdatePropertys);
 		(*pBundle) << this->id();
 		(*pBundle).append(*s1);
@@ -123,7 +123,7 @@ void Proxy::initClientCellPropertys()
 	if(clientEntityCall() == NULL)
 		return;
 
-	Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+	Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 	(*pBundle).newMessage(ClientInterface::onUpdatePropertys);
 	(*pBundle) << this->id();
 
@@ -147,7 +147,7 @@ void Proxy::initClientCellPropertys()
 		(*pBundle) << (ENTITY_PROPERTY_UID)0 << spaceuid << this->spaceID();
 	}
 
-	MemoryStream* s = MemoryStream::createPoolObject();
+	MemoryStream* s = MemoryStream::createPoolObject(OBJECTPOOL_POINT);
 
 	// celldata获取客户端感兴趣的数据初始化客户端 如:ALL_CLIENTS
 	try
@@ -175,7 +175,7 @@ void Proxy::onClientEnabled(void)
 {
 	SCOPED_PROFILE(SCRIPTCALL_PROFILE);
 	clientEnabled_ = true;
-	CALL_ENTITY_AND_COMPONENTS_METHOD(this, SCRIPT_OBJECT_CALL_ARGS0(pyTempObj, const_cast<char*>("onClientEnabled"), GETERR));
+	CALL_COMPONENTS_AND_ENTITY_METHOD(this, SCRIPT_OBJECT_CALL_ARGS0(pyTempObj, const_cast<char*>("onClientEnabled"), GETERR));
 }
 
 //-------------------------------------------------------------------------------------
@@ -379,14 +379,14 @@ void Proxy::giveClientTo(Proxy* proxy)
 			// 当前这个entity如果有cell，说明已经绑定了witness， 那么既然我们将控制权
 			// 交换给了另一个entity， 这个entity需要解绑定witness。
 			// 通知cell丢失witness
-			Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+			Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 			(*pBundle).newMessage(CellappInterface::onLoseWitness);
 			(*pBundle) << this->id();
 			sendToCellapp(pBundle);
 		}
 
 		// 既然客户端失去对其的控制, 那么通知client销毁这个entity
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(ClientInterface::onEntityDestroyed);
 		(*pBundle) << this->id();
 		sendToClient(ClientInterface::onEntityDestroyed, pBundle);
@@ -425,7 +425,7 @@ void Proxy::onGetWitness()
 	if(cellEntityCall())
 	{
 		// 通知cell获得客户端
-		Network::Bundle* pBundle = Network::Bundle::createPoolObject();
+		Network::Bundle* pBundle = Network::Bundle::createPoolObject(OBJECTPOOL_POINT);
 		(*pBundle).newMessage(CellappInterface::onGetWitnessFromBase);
 		(*pBundle) << this->id();
 		sendToCellapp(pBundle);
@@ -587,7 +587,7 @@ PyObject* Proxy::__py_pyStreamFileToClient(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O", &pyResourceName) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Proxy::streamFileToClient: args is error!");
+			PyErr_Format(PyExc_TypeError, "Proxy::streamFileToClient: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
@@ -596,7 +596,7 @@ PyObject* Proxy::__py_pyStreamFileToClient(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O|O", &pyResourceName, &pyDesc) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Proxy::streamFileToClient: args is error!");
+			PyErr_Format(PyExc_TypeError, "Proxy::streamFileToClient: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
@@ -605,19 +605,17 @@ PyObject* Proxy::__py_pyStreamFileToClient(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O|O|H", &pyResourceName, &pyDesc, &id) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Proxy::streamFileToClient: args is error!");
+			PyErr_Format(PyExc_TypeError, "Proxy::streamFileToClient: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
 	}
 
-	char* pDescr = NULL;
+	const char* pDescr = NULL;
 
 	if (pyDesc)
 	{
-		wchar_t* PyUnicode_AsWideCharStringRet1 = PyUnicode_AsWideCharString(pyDesc, NULL);
-		pDescr = strutil::wchar2char(PyUnicode_AsWideCharStringRet1);
-		PyMem_Free(PyUnicode_AsWideCharStringRet1);
+		pDescr = PyUnicode_AsUTF8AndSize(pyDesc, NULL);
 	}
 
 	if(pDescr && strlen(pDescr) > 255)
@@ -626,16 +624,12 @@ PyObject* Proxy::__py_pyStreamFileToClient(PyObject* self, PyObject* args)
 			strlen(pDescr));
 
 		PyErr_PrintEx(0);
-		free(pDescr);
 		return NULL;
 	}
 
 	int16 rid = pobj->streamFileToClient(pyResourceName, 
 							(pDescr == NULL ? "" : pDescr),  
 							id);
-
-	if(pDescr)
-		free(pDescr);
 
 	return PyLong_FromLong(rid);
 }
@@ -682,7 +676,7 @@ PyObject* Proxy::__py_pyStreamStringToClient(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O", &pyData) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Proxy::streamStringToClient: args is error!");
+			PyErr_Format(PyExc_TypeError, "Proxy::streamStringToClient: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
@@ -691,7 +685,7 @@ PyObject* Proxy::__py_pyStreamStringToClient(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O|O", &pyData, &pyDesc) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Proxy::streamStringToClient: args is error!");
+			PyErr_Format(PyExc_TypeError, "Proxy::streamStringToClient: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
@@ -700,19 +694,17 @@ PyObject* Proxy::__py_pyStreamStringToClient(PyObject* self, PyObject* args)
 	{
 		if(PyArg_ParseTuple(args, "O|O|H", &pyData, &pyDesc, &id) == -1)
 		{
-			PyErr_Format(PyExc_TypeError, "Proxy::streamStringToClient: args is error!");
+			PyErr_Format(PyExc_TypeError, "Proxy::streamStringToClient: args error!");
 			PyErr_PrintEx(0);
 			return NULL;
 		}
 	}
 
-	char* pDescr = NULL;
+	const char* pDescr = NULL;
 
 	if (pyDesc)
 	{
-		wchar_t* PyUnicode_AsWideCharStringRet1 = PyUnicode_AsWideCharString(pyDesc, NULL);
-		pDescr = strutil::wchar2char(PyUnicode_AsWideCharStringRet1);
-		PyMem_Free(PyUnicode_AsWideCharStringRet1);
+		pDescr = PyUnicode_AsUTF8AndSize(pyDesc, NULL);
 	}
 
 	if(pDescr && strlen(pDescr) > 255)
@@ -721,7 +713,6 @@ PyObject* Proxy::__py_pyStreamStringToClient(PyObject* self, PyObject* args)
 			strlen(pDescr));
 
 		PyErr_PrintEx(0);
-		free(pDescr);
 		return NULL;
 	}
 
@@ -729,8 +720,10 @@ PyObject* Proxy::__py_pyStreamStringToClient(PyObject* self, PyObject* args)
 						(pDescr == NULL ? "" : pDescr),  
 						id);
 
-	if(pDescr)
-		free(pDescr);
+	if (rid != id)
+	{
+		WARNING_MSG(fmt::format("Proxy::streamFileToClient: the id({}) has been used, a new id({}) is assigned!\n", id, rid));
+	}
 
 	return PyLong_FromLong(rid);
 }

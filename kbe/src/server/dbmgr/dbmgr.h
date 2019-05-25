@@ -14,6 +14,7 @@
 #include "server/serverconfig.h"
 #include "server/globaldata_client.h"
 #include "server/globaldata_server.h"
+#include "server/callbackmgr.h"	
 #include "common/timer.h"
 #include "network/endpoint.h"
 #include "resmgr/resmgr.h"
@@ -56,13 +57,16 @@ public:
 	bool inInitialize();
 	bool initializeEnd();
 	void finalise();
+
+	bool installPyModules();
+	bool uninstallPyModules();
 	void onInstallPyModules();
 	
 	bool initInterfacesHandler();
 
 	bool initDB();
 
-	virtual bool canShutdown();
+	virtual ShutdownHandler::CAN_SHUTDOWN_STATE canShutdown();
 
 	virtual void onShutdownBegin();
 	virtual void onShutdownEnd();
@@ -221,6 +225,17 @@ public:
 
 	virtual void onChannelDeregister(Network::Channel * pChannel);
 
+	InterfacesHandler* findBestInterfacesHandler();
+
+	/**
+		向dbmgr请求执行一个数据库命令
+	*/
+	static PyObject* __py_executeRawDatabaseCommand(PyObject* self, PyObject* args);
+	void executeRawDatabaseCommand(const char* datas, uint32 size, PyObject* pycallback, ENTITY_ID eid, const std::string& dbInterfaceName);
+	void onExecuteRawDatabaseCommandCB(KBEngine::MemoryStream& s);
+
+	PY_CALLBACKMGR& callbackMgr() { return pyCallbackMgr_; }
+
 protected:
 	TimerHandle											loopCheckTimerHandle_;
 	TimerHandle											mainProcessTimer_;
@@ -247,8 +262,7 @@ protected:
 	uint32												numExecuteRawDatabaseCommand_;
 	uint32												numCreatedAccount_;
 
-	InterfacesHandler*									pInterfacesAccountHandler_;
-	InterfacesHandler*									pInterfacesChargeHandler_;
+	std::vector<InterfacesHandler*>						pInterfacesHandlers_;
 
 	SyncAppDatasHandler*								pSyncAppDatasHandler_;
 	UpdateDBServerLogHandler*							pUpdateDBServerLogHandler_;
@@ -256,6 +270,8 @@ protected:
 	TelnetServer*										pTelnetServer_;
 
 	std::map<COMPONENT_ID, uint64>						loseBaseappts_;
+
+	PY_CALLBACKMGR										pyCallbackMgr_;
 };
 
 }

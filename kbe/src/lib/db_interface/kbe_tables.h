@@ -53,7 +53,7 @@ public:
 		COMPONENT_ID componentID;
 
 		// 由谁记录
-		COMPONENT_ID logger;
+		COMPONENT_ID serverGroupID;
 	};
 
 	KBEEntityLogTable(EntityTables* pEntityTables) :
@@ -91,7 +91,9 @@ public:
 		uint64 heartbeatTime;
 
 		// 由谁记录
-		COMPONENT_ID logger;
+		COMPONENT_ID serverGroupID;
+
+		uint8 isShareDB;
 	};
 
 	KBEServerLogTable(EntityTables* pEntityTables) :
@@ -107,10 +109,11 @@ public:
 	virtual bool updateServer(DBInterface * pdbi) = 0;
 
 	virtual bool queryServer(DBInterface * pdbi, ServerLog& serverlog) = 0;
-	
+	virtual std::vector<COMPONENT_ID> queryServers(DBInterface * pdbi) = 0;
+
 	virtual std::vector<COMPONENT_ID> queryTimeOutServers(DBInterface * pdbi) = 0;
 
-	virtual bool clearTimeoutLogs(DBInterface * pdbi, const std::vector<COMPONENT_ID>& cids) = 0;
+	virtual bool clearServers(DBInterface * pdbi, const std::vector<COMPONENT_ID>& cids) = 0;
 	
 protected:
 	

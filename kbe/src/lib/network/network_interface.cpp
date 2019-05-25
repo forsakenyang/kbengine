@@ -65,7 +65,7 @@ NetworkInterface::NetworkInterface(Network::EventDispatcher * pDispatcher,
 		// 如果配置了对外端口范围， 如果范围过小这里extEndpoint_可能没有端口可用了
 		if (extlisteningUdpPort_min != -1)
 		{
-			KBE_ASSERT(extTcpEndpoint_.good() && "Channel::EXTERNAL-UDP: no available udp-port, "
+			KBE_ASSERT(extUdpEndpoint_.good() && "Channel::EXTERNAL-UDP: no available udp-port, "
 				"please check for kbengine[_defs].xml!\n");
 		}
 	}
@@ -440,13 +440,20 @@ void NetworkInterface::processChannels(KBEngine::Network::MessageHandlers* pMsgH
 		{
 			++iter;
 		}
-		else if(pChannel->isCondemn())
+		else if(pChannel->condemn() > 0)
 		{
 			++iter;
 
-			deregisterChannel(pChannel);
-			pChannel->destroy();
-			Network::Channel::reclaimPoolObject(pChannel);
+			if (pChannel->condemn() == Network::Channel::FLAG_CONDEMN_AND_WAIT_DESTROY && pChannel->sending())
+			{
+				pChannel->updateTick(pMsgHandlers);
+			}
+			else
+			{
+				deregisterChannel(pChannel);
+				pChannel->destroy();
+				Network::Channel::reclaimPoolObject(pChannel);
+			}
 		}
 		else
 		{

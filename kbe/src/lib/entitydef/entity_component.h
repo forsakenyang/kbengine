@@ -5,6 +5,7 @@
 #define KBE_ENTITY_COMPONENT_H
 	
 #include "common/common.h"
+#include "common/timer.h"
 #include "pyscript/scriptobject.h"
 #include "entitydef/common.h"
 #include "entitydef/scriptdef_module.h"
@@ -24,6 +25,18 @@ namespace KBEngine {
 	}																											\
 }																												\
 
+
+#define CALL_COMPONENTS_AND_ENTITY_METHOD(ENTITYOBJ, CALLCODE)													\
+{																												\
+	{																											\
+		Py_INCREF(ENTITYOBJ);																					\
+		PyObject* pyTempObj = ENTITYOBJ;																		\
+		CALL_ENTITY_COMPONENTS_METHOD(ENTITYOBJ, CALLCODE);														\
+		bool GETERR = false;																					\
+		CALLCODE;																								\
+		Py_DECREF(ENTITYOBJ);																					\
+	}																											\
+}																												\
 
 
 #define CALL_ENTITY_COMPONENTS_METHOD(ENTITYOBJ, CALLCODE)														\
@@ -69,7 +82,6 @@ class EntityComponent : public script::ScriptObject
 	BASE_SCRIPT_HREADER(EntityComponent, ScriptObject)
 public:
 	EntityComponent(ENTITY_ID ownerID, ScriptDefModule* pComponentDescrs, COMPONENT_TYPE assignmentToComponentType/*属性所属实体的哪一部分，cell或者base?*/);
-	
 	~EntityComponent();
 
 	/** 
@@ -84,6 +96,10 @@ public:
 
 	DECLARE_PY_GET_MOTHOD(pyIsDestroyed);
 
+	void destroyed() {
+		ownerID_ = 0;
+	}
+
 	bool isDestroyed() const {
 		return ownerID() == 0;
 	}
@@ -91,7 +107,7 @@ public:
 	DECLARE_PY_GET_MOTHOD(pyGetOwner);
 
 	DECLARE_PY_MOTHOD_ARG3(pyAddTimer, float, float, int32);
-	DECLARE_PY_MOTHOD_ARG1(pyDelTimer, ScriptID);
+	DECLARE_PY_MOTHOD_ARG1(pyDelTimer, PyObject_ptr);
 
 	/** 
 		获得描述 
